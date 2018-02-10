@@ -1,5 +1,10 @@
 function [model, pre_net] = funcDeepNetTrainNoRolling(train_data, train_target, cv_data,cv_label, test_data, test_label, opts)
 global is_wiener_mask;
+
+% support multiple snr and noise
+global tmp_str noise_num snr_num;
+global num_mix_per_test_part;
+
 %% network initialization
 net_struct = opts.net_struct;
 isGPU = opts.isGPU;

@@ -1,4 +1,4 @@
-function run_every(noise, feat, db, is_wiener_mask)
+function run_every(noise, feat, db, is_wiener_mask, num_mix_per_test_part)
 % GPU detection
 try
    gpuDevice;
@@ -29,6 +29,13 @@ DFI = train_handle.DFI;
 small_mix_cell = train_handle.small_mix_cell;
 small_noise_cell = train_handle.small_noise_cell;
 small_speech_cell = train_handle.small_speech_cell;
+
+% add support for multiple noise
+tmp_str = strsplit(noise, '_');
+noise_num = length(tmp_str);
+
+% add support for multiple SNR
+snr_num = length(db);
 
 toc
 dnn_train

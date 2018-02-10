@@ -65,6 +65,9 @@ cv_data = make_window_buffer(cv_data, opts.train_neighbour);
 train_data = make_window_buffer(train_handle.train_data, opts.train_neighbour);
 train_target = train_handle.train_target;
 
+% support multiple snr and noise
+global tmp_str noise_num snr_num;
+global num_mix_per_test_part;
 [model, pre_net] = funcDeepNetTrainNoRolling(train_data, train_target, cv_data,cv_label, test_data, test_label, opts);
 
 train_time = toc;
