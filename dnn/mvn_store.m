@@ -1,13 +1,43 @@
-function run_every(noise, feat, db, TMP_STORE)
+function run_every(noise, feat, db, TMP_STORE, num_mix_per_test_part)
 format compact;
 
 fprintf(1,'MVNing Feat=%s Noise=%s\n', feat, noise);
 
-root_path = [TMP_STORE filesep 'db' num2str(db) filesep]
-speech_data_path = [root_path 'mix' filesep 'test_' noise '_mix_aft2.mat'];
-load(speech_data_path);
+tmp_str = strsplit(noise, '_');
+
+% add support for multiple noise
+noise_num = length(tmp_str);
+
+% add support for multiple SNR
+snr_num = length(db);
+
+tmp_small_mix_cell = cell(1, num_mix_per_test_part * snr_num * noise_num);
+tmp_small_noise_cell = cell(1, num_mix_per_test_part * snr_num * noise_num);
+tmp_small_speech_cell = cell(1, num_mix_per_test_part * snr_num * noise_num);
+
+% run through all snr and noise types
+for i=1:snr_num
+	cur_db = db(i);
+	for j=1:noise_num
+			cur_noise = tmp_str{j};
+			root_path = [TMP_STORE filesep 'db' num2str(cur_db) filesep]
+			speech_data_path = [root_path 'mix' filesep 'test_' cur_noise '_mix_aft2.mat'];
+			load(speech_data_path);
+			cur_cell = 1+num_mix_per_test_part*((i-1)*noise_num+j-1);
+			tmp_small_speech_cell(cur_cell:cur_cell-1+num_mix_per_test_part) = small_speech_cell; 
+			tmp_small_mix_cell(cur_cell:cur_cell-1+num_mix_per_test_part) = small_mix_cell;
+			tmp_small_noise_cell(cur_cell:cur_cell-1+num_mix_per_test_part) = small_noise_cell;
+	end
+end
+
+small_speech_cell = tmp_small_speech_cell;
+small_noise_cell = tmp_small_noise_cell;
+small_mix_cell = tmp_small_mix_cell;
+
+
 
 % test_set
+root_path = [TMP_STORE filesep 'db' num2str(db) filesep]
 load([root_path 'feat' filesep 'test_' noise '_' feat '.mat']); %test set
 test_data = feat_data; test_label = feat_label;
 clear feat_data feat_label

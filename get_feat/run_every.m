@@ -22,7 +22,7 @@ snr_num = length(db);
 feat_data = []; feat_label=[];
 DFI = zeros(feat_set_size*snr_num*noise_num ,2);
 cur_dfi_entry = 1;
-cur_dfi_row = 1;
+cur_dfi_row = 0;
 
 
 % run through all SNRs
