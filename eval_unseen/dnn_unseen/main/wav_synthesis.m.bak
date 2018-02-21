@@ -1,0 +1,154 @@
+function [ syn_wav ] = wav_synthesis( label, fs, win_len, win_shift, sca_fac )
+%Returns a synthesised speech using the output from NN
+% Input:
+% label: output from DNN, matrix containing amplititude and IF (phase)
+% fs: sampling frequency
+% win_len: window length
+% win_shift: shift between windows
+% sca_fac: scaling factor used in generating the training labels
+
+label = label';
+num_col_split = size(label,2)/2;
+
+% use for ad_bpd
+%num_col_split = floor(win_len/2);
+
+
+num_frame = size(label, 1);
+%amp_frame = zeros(num_frame, win_len);
+%phase_frame = zeros(num_frame, win_len);
+
+% split the labels into ampltitude matrix and phase matrix
+% MODIFIED: use IF instead of phase
+amp_frame = label(:, 1:num_col_split);
+%phase_frame = label(:, num_col_split+1:size(label,2));
+ins_freq = label(:, num_col_split+1:size(label,2));
+
+
+% extract bpd from ad_bpd
+%r_bpd = zeros(size(ins_freq,1),floor(size(ins_freq,2)/2));
+%for i=1:floor(size(ins_freq,2)/2)
+%	r_bpd(:,i)=ins_freq(:,2*i);
+%end
+%ins_freq = r_bpd;
+
+%ins_freq = ins_freq - amp_frame * 0.8;
+
+%amp_frame = amp_frame / sca_fac;
+
+% inverse hyperbolic tangent
+%q = 1;
+%c = 0.1;
+%amp_frame = - 1/c * log((q-amp_frame)./(q+amp_frame));
+
+%phase_frame = phase_frame / sca_fac;
+%ins_freq = ins_freq * 4 * pi;
+
+% recover IF from scaling BPD
+x = 1:size(ins_freq,2);
+c = 1e-2;
+% linear
+y0 = 1 - (1-c)/win_len.*x;
+r0 = 1./y0;
+% -log
+y1 = log((exp(c)-exp(1))/win_len.*x+exp(1));
+r1 = 1./y1;
+% 1/x
+y2 = 1 ./( (1 - c) ./ (win_len * c) .* x + 1);
+r2 = 1./y2;
+% logistic
+b = -10^0.3;
+a = (1+exp(b));
+k = (log((1-c)/c)-b)/win_len;
+y3 = a./(1+exp(k.*x+b));
+r3 = 1./y3;
+% unscaled
+y4 = ones(1, size(ins_freq,2));
+r4 = y4;
+
+sca_win = y4;
+sca_rec = r4;
+sca_win = repmat(sca_win,size(ins_freq,1),1);
+%sca_rec = repmat(sca_rec,size(bpd,1),1);
+
+rec_bpd = ins_freq ./ sca_win;
+ins_freq = rec_bpd;
+ins_freq(1,:) = ins_freq(1,:)/1;
+
+% use when residual is included
+bpd = ins_freq * 2 * pi;
+bpd = 2*pi-bpd;
+wkl = repmat(1:size(ins_freq,2), size(ins_freq, 1), 1);
+wkl = win_shift * 2 * pi * wkl / win_len;
+
+ins_freq = princ(bpd - pi - wkl);
+
+% IF = IF/2PI + amp
+%ins_freq = ins_freq - amp_frame;
+%ins_freq = ins_freq * 10;
+
+% use IF to reconstruct phase
+phase_frame = zeros(num_frame, num_col_split);
+phase_frame(1,:) = ins_freq(1,:);
+
+for i=2:num_frame
+    phase_frame(i,:) = princ(phase_frame(i-1,:) + ins_freq(i,:));
+end
+
+% use phase labels instead of IF
+%phase_frame = ins_freq;
+
+% throw the values below the threshold
+thres = 0 / sca_fac;
+idx = amp_frame<thres;
+amp_frame(idx) = 0;
+
+% synthesis signal frame by frame
+% for i=1:num_frame
+%     non_zero_idx = find( amp_frame(i,:)~=0 );
+%     
+%     %sum(non_zero_idx)
+%     
+%     % angular frequency
+%     harm_freq = 2*pi*(non_zero_idx - 1)/win_len;
+%     
+%     cur_amp_row = amp_frame(i,:);
+%     cur_phase_row = phase_frame(i,:);
+%     
+%     harm_amp = cur_amp_row(non_zero_idx);
+%     harm_phase = cur_phase_row(non_zero_idx);
+%     
+%     idx = 1:win_len;
+%     for j=1:length(non_zero_idx)
+%         wav_frame(i,:) = wav_frame(i,:) + 2*harm_amp(j)*cos(idx*harm_freq(j)+harm_phase(j));
+%     end
+% end
+
+dft_frame = zeros(num_frame, win_len);
+wav_frame = zeros(num_frame, win_len);
+%idx = 0:win_len-1;
+
+for i=1:num_frame
+    for j=1:num_col_split
+
+        % idx = 1:win_len;
+        %wav_frame(i,:) = wav_frame(i,:) + 2 * amp_frame(i,j) * cos((2*pi*(j-1)/win_len).*idx-phase_frame(i,j));
+        
+        % generate wav by IDFT instead of summing up cosine function
+        dft_frame(i,j) = amp_frame(i,j)*exp(1j*phase_frame(i,j));
+        
+    end
+end
+
+% construct whole frame
+%dft_frame(:,num_col_split+1:win_len) = fliplr(dft_frame(:,1:num_col_split));
+
+win_fun = hanning(win_len);
+wav_frame = real(ifft(dft_frame')');
+
+syn_wav = overlapadd(wav_frame, win_fun, win_shift);
+
+syn_wav = syn_wav./max(abs(syn_wav));
+
+end
+
